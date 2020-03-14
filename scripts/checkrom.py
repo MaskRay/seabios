@@ -23,7 +23,7 @@ def main():
 
     # Read in symbols
     objinfofile = open(objinfo, 'r')
-    symbols = layoutrom.parseObjDump(objinfofile, 'in')[1]
+    symbols = layoutrom.parseReadElf(objinfofile, 'in')[1]
 
     # Read in raw file
     f = open(rawfile, 'rb')

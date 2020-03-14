@@ -20,7 +20,7 @@ endif
 AS=$(CROSS_PREFIX)as
 LD=$(CROSS_PREFIX)ld
 OBJCOPY=$(CROSS_PREFIX)objcopy
-OBJDUMP=$(CROSS_PREFIX)objdump
+READELF=$(CROSS_PREFIX)readelf
 STRIP=$(CROSS_PREFIX)strip
 PYTHON=python
 CPP=cpp
@@ -161,14 +161,14 @@ $(OUT)romlayout.o: src/romlayout.S $(OUT)autoconf.h $(OUT)asm-offsets.h
 
 $(OUT)romlayout16.lds: $(OUT)ccode32flat.o $(OUT)code32seg.o $(OUT)ccode16.o $(OUT)romlayout.o src/version.c scripts/layoutrom.py scripts/buildversion.py
 	@echo "  Building ld scripts"
-	$(Q)$(PYTHON) ./scripts/buildversion.py -e "$(EXTRAVERSION)" -t "$(CC);$(AS);$(LD);$(OBJCOPY);$(OBJDUMP);$(STRIP)" $(OUT)autoversion.h
+	$(Q)$(PYTHON) ./scripts/buildversion.py -e "$(EXTRAVERSION)" -t "$(CC);$(AS);$(LD);$(OBJCOPY);$(READELF);$(STRIP)" $(OUT)autoversion.h
 	$(Q)$(CC) $(CFLAGS32FLAT) -c src/version.c -o $(OUT)version.o
 	$(Q)$(LD) $(LD32BIT_FLAG) -r $(OUT)ccode32flat.o $(OUT)version.o -o $(OUT)code32flat.o
 	$(Q)$(LD) $(LD32BIT_FLAG) -r $(OUT)ccode16.o $(OUT)romlayout.o -o $(OUT)code16.o
-	$(Q)$(OBJDUMP) -thr $(OUT)code32flat.o > $(OUT)code32flat.o.objdump
-	$(Q)$(OBJDUMP) -thr $(OUT)code32seg.o > $(OUT)code32seg.o.objdump
-	$(Q)$(OBJDUMP) -thr $(OUT)code16.o > $(OUT)code16.o.objdump
-	$(Q)$(PYTHON) ./scripts/layoutrom.py $(OUT)code16.o.objdump $(OUT)code32seg.o.objdump $(OUT)code32flat.o.objdump $(OUT)$(KCONFIG_AUTOHEADER) $(OUT)romlayout16.lds $(OUT)romlayout32seg.lds $(OUT)romlayout32flat.lds
+	$(Q)$(READELF) -WSrs $(OUT)code32flat.o > $(OUT)code32flat.o.readelf
+	$(Q)$(READELF) -WSrs $(OUT)code32seg.o > $(OUT)code32seg.o.readelf
+	$(Q)$(READELF) -WSrs $(OUT)code16.o > $(OUT)code16.o.readelf
+	$(Q)$(PYTHON) ./scripts/layoutrom.py $(OUT)code16.o.readelf $(OUT)code32seg.o.readelf $(OUT)code32flat.o.readelf $(OUT)$(KCONFIG_AUTOHEADER) $(OUT)romlayout16.lds $(OUT)romlayout32seg.lds $(OUT)romlayout32flat.lds
 
 # These are actually built by scripts/layoutrom.py above, but by pulling them
 # into an extra rule we prevent make -j from spawning layoutrom.py 4 times.
@@ -193,9 +193,9 @@ $(OUT)rom.o: $(OUT)rom16.strip.o $(OUT)rom32seg.strip.o $(OUT)code32flat.o $(OUT
 $(OUT)bios.bin.prep: $(OUT)rom.o scripts/checkrom.py
 	@echo "  Prepping $@"
 	$(Q)rm -f $(OUT)bios.bin $(OUT)Csm16.bin $(OUT)bios.bin.elf
-	$(Q)$(OBJDUMP) -thr $< > $<.objdump
+	$(Q)$(READELF) -WSrs $< > $<.readelf
 	$(Q)$(OBJCOPY) -O binary $< $(OUT)bios.bin.raw
-	$(Q)$(PYTHON) ./scripts/checkrom.py $<.objdump $(CONFIG_ROM_SIZE) $(OUT)bios.bin.raw $(OUT)bios.bin.prep
+	$(Q)$(PYTHON) ./scripts/checkrom.py $<.readelf $(CONFIG_ROM_SIZE) $(OUT)bios.bin.raw $(OUT)bios.bin.prep
 
 $(OUT)bios.bin: $(OUT)bios.bin.prep
 	@echo "  Creating $@"
@@ -237,7 +237,7 @@ $(OUT)vgaentry.o: vgasrc/vgaentry.S $(OUT)autoconf.h $(OUT)asm-offsets.h
 
 $(OUT)vgarom.o: $(OUT)vgaccode16.o $(OUT)vgaentry.o $(OUT)vgasrc/vgalayout.lds vgasrc/vgaversion.c scripts/buildversion.py
 	@echo "  Linking $@"
-	$(Q)$(PYTHON) ./scripts/buildversion.py -e "$(EXTRAVERSION)" -t "$(CC);$(AS);$(LD);$(OBJCOPY);$(OBJDUMP);$(STRIP)" $(OUT)autovgaversion.h
+	$(Q)$(PYTHON) ./scripts/buildversion.py -e "$(EXTRAVERSION)" -t "$(CC);$(AS);$(LD);$(OBJCOPY);$(READELF);$(STRIP)" $(OUT)autovgaversion.h
 	$(Q)$(CC) $(CFLAGS16) -c vgasrc/vgaversion.c -o $(OUT)vgaversion.o
 	$(Q)$(LD) --gc-sections -T $(OUT)vgasrc/vgalayout.lds $(OUT)vgaccode16.o $(OUT)vgaentry.o $(OUT)vgaversion.o -o $@
 
