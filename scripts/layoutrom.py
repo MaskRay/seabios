@@ -335,14 +335,19 @@ def outRelSections(sections, startsym, useseg=0):
                 if section.finalloc is not None]
     sections.sort(key=operator.itemgetter(0))
     out = ""
+    dot = "_reloc_init_end"
     for addr, section in sections:
         loc = section.finalloc
         if useseg:
             loc = section.finalsegloc
-        out += ". = ( 0x%x - %s ) ;\n" % (loc, startsym)
+        if isinstance(dot, str):
+            out += ". += 0x%x - %s ;\n" % (loc, dot)
+        elif dot < loc:
+            out += ". += 0x%x ;\n" % (loc-dot,)
         if section.name in ('.rodata.str1.1', '.rodata'):
             out += "_rodata%s = . ;\n" % (section.fileid,)
         out += "*%s.*(%s)\n" % (section.fileid, section.name)
+        dot = loc + section.size
     return out
 
 # Build linker script output for a list of relocations.
