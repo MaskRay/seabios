@@ -544,87 +544,80 @@ class Reloc:
 class Symbol:
     name = offset = section = None
 
-# Read in output from objdump
-def parseObjDump(file, fileid):
+def parseReadElf(file, fileid):
     # sections = [section, ...]
     sections = []
     sectionmap = {}
     # symbols[symbolname] = symbol
     symbols = {}
+    lines = file.readlines()
 
-    state = None
-    for line in file.readlines():
-        line = line.rstrip()
-        if line == 'Sections:':
-            state = 'section'
-            continue
-        if line == 'SYMBOL TABLE:':
-            state = 'symbol'
-            continue
-        if line.startswith('RELOCATION RECORDS FOR ['):
-            sectionname = line[24:-2]
-            if sectionname.startswith('.debug_'):
-                # Skip debugging sections (to reduce parsing time)
-                state = None
-                continue
-            state = 'reloc'
-            relocsection = sectionmap[sectionname]
-            continue
+    i = 0
+    while not lines[i].startswith('Section Headers'):
+        i += 1
+    i += 3  # Skip [Nr] and [ 0]
+    while ']' in lines[i]:
+        parts = lines[i][lines[i].find(']')+1:].split()
+        if len(parts) == 10:
+            name, _, _, _, size, _, _, _, _, align = parts
+        else:  # not SHF_ALLOC
+            name, _, _, _, size, _, _, _, align = parts
+        section = Section()
+        section.name = name
+        section.size = int(size, 16)
+        section.align = int(align)
+        section.fileid = fileid
+        section.relocs = []
+        sections.append(section)
+        sectionmap[name] = section
+        i += 1
 
-        if state == 'section':
-            try:
-                idx, name, size, vma, lma, fileoff, align = line.split()
-                if align[:3] != '2**':
-                    continue
-                section = Section()
-                section.name = name
-                section.size = int(size, 16)
-                section.align = 2**int(align[3:])
-                section.fileid = fileid
-                section.relocs = []
-                sections.append(section)
-                sectionmap[name] = section
-            except ValueError:
-                pass
+    while not lines[i].startswith('Symbol table '):
+        i += 1
+    i += 3  # Skip Num: and 0:
+    while i < len(lines) and ':' in lines[i]:
+        colon = lines[i].find(':')
+        parts = lines[i].split()
+        try:
+            ndx = int(parts[6])
+            name = sections[ndx-1].name
+        except ValueError:  # ABS or UND
+            ndx = 0
+            name = ''
+        if parts[3] != 'SECTION':
+            name = parts[7]
+        symbol = Symbol()
+        symbol.size = int(parts[2])
+        symbol.offset = int(parts[1], 16)
+        symbol.name = name
+        symbol.section = sections[ndx-1] if ndx > 0 else None
+        symbols[name] = symbol
+        i += 1
+
+    i = 0
+    while i < len(lines):
+        if not lines[i].startswith('Relocation section'):
+            i += 1
             continue
-        if state == 'symbol':
-            try:
-                parts = line[17:].split()
-                if len(parts) == 3:
-                    sectionname, size, name = parts
-                elif len(parts) == 4 and parts[2] == '.hidden':
-                    sectionname, size, hidden, name = parts
-                else:
-                    continue
-                symbol = Symbol()
-                symbol.size = int(size, 16)
-                symbol.offset = int(line[:8], 16)
-                symbol.name = name
-                symbol.section = sectionmap.get(sectionname)
-                symbols[name] = symbol
-            except ValueError:
-                pass
+        rel_name = lines[i][20:lines[i].index("'", 20)]
+        i += 2
+        if rel_name.startswith('.rel.debug_'):
+            # Skip debugging sections (to reduce parsing time)
             continue
-        if state == 'reloc':
-            try:
-                off, type, symbolname = line.split()
-                reloc = Reloc()
-                reloc.offset = int(off, 16)
-                reloc.type = type
-                reloc.symbolname = symbolname
-                reloc.symbol = symbols.get(symbolname)
-                if reloc.symbol is None:
-                    # Some binutils (2.20.1) give section name instead
-                    # of a symbol - create a dummy symbol.
-                    reloc.symbol = symbol = Symbol()
-                    symbol.size = 0
-                    symbol.offset = 0
-                    symbol.name = symbolname
-                    symbol.section = sectionmap.get(symbolname)
-                    symbols[symbolname] = symbol
-                relocsection.relocs.append(reloc)
-            except ValueError:
-                pass
+        assert rel_name.startswith('.rel')
+        relocated = sectionmap[rel_name[4:]]
+        while lines[i][0].isalnum():
+            line = lines[i]
+            off, _, typ, _, symbolname = line.split()
+            reloc = Reloc()
+            reloc.offset = int(off, 16)
+            reloc.type = typ
+            reloc.symbolname = symbolname
+            reloc.symbol = symbols.get(symbolname)
+            assert reloc.symbol is not None
+            relocated.relocs.append(reloc)
+            i += 1
+
     return sections, symbols
 
 # Parser for constants in simple C header files.
@@ -653,9 +646,9 @@ def main():
     infile32flat = open(in32flat, 'r')
 
     # infoX = (sections, symbols)
-    info16 = parseObjDump(infile16, '16')
-    info32seg = parseObjDump(infile32seg, '32seg')
-    info32flat = parseObjDump(infile32flat, '32flat')
+    info16 = parseReadElf(infile16, '16')
+    info32seg = parseReadElf(infile32seg, '32seg')
+    info32flat = parseReadElf(infile32flat, '32flat')
 
     # Read kconfig config file
     config = scanconfig(cfgfile)
