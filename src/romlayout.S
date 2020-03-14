@@ -587,7 +587,7 @@ entry_18:
 
         // Specify a location in the fixed part of bios area.
         .macro ORG addr
-        .section .fixedaddr.\addr
+        .section .fixedaddr.\addr,"a"
         .endm
 
         ORG 0xe05b

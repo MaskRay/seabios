@@ -321,6 +321,10 @@ def outXRefs(sections, useseg=0, exportsyms=[], forcedelta=0):
 
 # Write LD script includes for the given sections
 def outSections(sections, useseg=0):
+    if useseg:
+        sections.sort(key=lambda x: x.finalsegloc)
+    else:
+        sections.sort(key=lambda x: x.finalloc)
     out = ""
     for section in sections:
         loc = section.finalloc
