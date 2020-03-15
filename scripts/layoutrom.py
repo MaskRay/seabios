@@ -438,7 +438,7 @@ def writeLinkerScripts(li, out16, out32seg, out32flat):
 %s
 %s
         code32flat_end = ABSOLUTE(.) ;
-    } :text
+    }
 """ % (li.sec32init_align,
        li.zonefseg_start,
        li.zonefseg_end,
@@ -455,10 +455,6 @@ def writeLinkerScripts(li, out16, out32seg, out32flat):
        outRelSections(li.sections, 'code32flat_start'))
     out = COMMONHEADER + out + COMMONTRAILER + """
 ENTRY(%s)
-PHDRS
-{
-        text PT_LOAD AT ( code32flat_start ) ;
-}
 """ % (li.entrysym.name,)
     outfile = open(out32flat, 'w')
     outfile.write(out)

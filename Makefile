@@ -182,13 +182,13 @@ $(OUT)rom32seg.o: $(OUT)code32seg.o $(OUT)romlayout32seg.lds
 	@echo "  Linking $@"
 	$(Q)$(LD) -T $(OUT)romlayout32seg.lds $< -o $@
 
-$(OUT)rom.o: $(OUT)rom16.strip.o $(OUT)rom32seg.strip.o $(OUT)code32flat.o $(OUT)romlayout32flat.lds
+$(OUT)bios.bin.elf: $(OUT)rom16.strip.o $(OUT)rom32seg.strip.o $(OUT)code32flat.o $(OUT)romlayout32flat.lds
 	@echo "  Linking $@"
 	$(Q)$(LD) -N -T $(OUT)romlayout32flat.lds $(OUT)rom16.strip.o $(OUT)rom32seg.strip.o $(OUT)code32flat.o -o $@
 
-$(OUT)bios.bin.prep: $(OUT)rom.o scripts/checkrom.py
+$(OUT)bios.bin.prep: $(OUT)bios.bin.elf scripts/checkrom.py
 	@echo "  Prepping $@"
-	$(Q)rm -f $(OUT)bios.bin $(OUT)Csm16.bin $(OUT)bios.bin.elf
+	$(Q)rm -f $(OUT)bios.bin $(OUT)Csm16.bin
 	$(Q)$(READELF) -WSrs $< > $<.readelf
 	$(Q)$(OBJCOPY) -O binary $< $(OUT)bios.bin.raw
 	$(Q)$(PYTHON) ./scripts/checkrom.py $<.readelf $(CONFIG_ROM_SIZE) $(OUT)bios.bin.raw $(OUT)bios.bin.prep
@@ -200,10 +200,6 @@ $(OUT)bios.bin: $(OUT)bios.bin.prep
 $(OUT)Csm16.bin: $(OUT)bios.bin.prep
 	@echo "  Creating $@"
 	$(Q)cp $< $@
-
-$(OUT)bios.bin.elf: $(OUT)rom.o $(OUT)bios.bin.prep
-	@echo "  Creating $@"
-	$(Q)$(STRIP) -R .comment $< -o $(OUT)bios.bin.elf
 
 
 ################ VGA build rules
