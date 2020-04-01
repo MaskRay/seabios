@@ -177,10 +177,14 @@ $(OUT)romlayout32seg.lds $(OUT)romlayout32flat.lds $(OUT)code32flat.o $(OUT)code
 $(OUT)rom16.o: $(OUT)code16.o $(OUT)romlayout16.lds
 	@echo "  Linking $@"
 	$(Q)$(LD) -T $(OUT)romlayout16.lds $< -o $@
+	# Change e_type to ET_REL so that it can be used to link rom.o.
+	# Unlike GNU ld, lld does not allow an ET_EXEC input.
+	printf '\1' | dd of=$@ conv=notrunc bs=1 seek=16 status=none
 
 $(OUT)rom32seg.o: $(OUT)code32seg.o $(OUT)romlayout32seg.lds
 	@echo "  Linking $@"
 	$(Q)$(LD) -T $(OUT)romlayout32seg.lds $< -o $@
+	printf '\1' | dd of=$@ conv=notrunc bs=1 seek=16 status=none
 
 $(OUT)rom.o: $(OUT)rom16.strip.o $(OUT)rom32seg.strip.o $(OUT)code32flat.o $(OUT)romlayout32flat.lds
 	@echo "  Linking $@"
